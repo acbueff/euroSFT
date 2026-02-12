@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
 #SBATCH --time=0-06:00:00
-#SBATCH --qos=boost_qos_dbg
+#SBATCH --qos=boost_qos_lprod
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 
@@ -27,7 +27,7 @@ CODE_DIR="${PROJECT_DIR}/code"
 
 # Container
 USE_CONTAINER=true
-CONTAINER="/leonardo_work/EUHPC_E05_119/containers/euroSFT.sif"
+CONTAINER="/leonardo_work/EUHPC_D21_101/containers/smoLLM_fixed.sif"
 
 # === Environment ===
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -102,9 +102,11 @@ run_python() {
     fi
 }
 
+# Temporarily disable set -e so we capture the exit code
+set +e
 run_python "${CODE_DIR}/train_sft.py"
-
 EXIT_CODE=$?
+set -e
 
 echo ""
 echo "======================================"
