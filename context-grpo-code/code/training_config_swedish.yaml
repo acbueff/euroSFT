@@ -1,0 +1,333 @@
+# FRÓÐI Training Configuration - SWEDISH ADAPTATION
+# Two-Stage Distillation for Swedish Language Acquisition
+# Stage 1: CPT (Continued Pre-Training) for fluency
+# Stage 2: SFT (Supervised Fine-Tuning) for reasoning
+#
+# ANTI-FORGETTING MEASURES:
+# - Replay buffer with pretraining data (15% of batch)
+# - Lower learning rate with warmup (10%)
+# - KL regularization to reference model
+# - Diverse task types (QA, MMLU-style, reasoning, translation, summarization)
+
+# ============================================================================
+# PHASE 1: KNOWLEDGE DISTILLATION (Two-Stage Process)
+# ============================================================================
+
+distillation:
+  output_dir: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/distillation_swedish"
+  
+  # Stage 1: Continued Pre-Training (CPT) for Swedish Fluency
+  # Target: ~5-10B tokens, 1 epoch (see every token once)
+  stage1_cpt:
+    enabled: true
+    epochs: 1  # Single epoch to avoid overfitting
+    batch_size: 4  # Smaller batch for memory with large context
+    max_length: 1024  # Longer context for language learning
+    gradient_accumulation_steps: 16  # Effective batch = 64
+    learning_rate: 1.0e-4  # Higher LR for rewiring embeddings
+    warmup_ratio: 0.03
+    
+    # Data mix for CPT (prevents forgetting English reasoning)
+    swedish_ratio: 0.85  # 85% Swedish
+    english_anchor_ratio: 0.15  # 15% English anchor
+    
+    # Save intermediate checkpoints
+    save_steps: 2000
+    logging_steps: 100
+  
+  # Stage 2: Supervised Fine-Tuning (SFT) for Reasoning
+  # ANTI-FORGETTING: Lower LR, warmup, replay buffer, diverse tasks
+  # MEMORY OPTIMIZED: Reduced batch size, increased grad accum
+  stage2_sft:
+    enabled: true
+    epochs: 2  # Reduced from 3 to prevent overfitting
+    batch_size: 4  # REDUCED from 8 to prevent OOM
+    max_length: 384  # REDUCED from 512 to save memory
+    gradient_accumulation_steps: 16  # INCREASED to maintain effective batch = 64
+    learning_rate: 2.0e-5  # REDUCED from 5e-5 to prevent forgetting
+    warmup_ratio: 0.10  # 10% warmup for stability
+    
+    # Data mix for SFT (balanced instruction types)
+    native_swedish_qa_ratio: 0.50  # 50% native Swedish QA/reasoning
+    translated_instructions_ratio: 0.30  # 30% translated English→Swedish
+    parallel_translation_ratio: 0.20  # 20% translation pairs
+    
+    # ANTI-FORGETTING MEASURES
+    replay_ratio: 0.10  # REDUCED from 0.15 to save memory
+    kl_regularization_weight: 0.05  # REDUCED from 0.1 - computed less frequently
+    kl_reg_interval: 4  # Only compute KL every N steps
+    
+    save_steps: 500
+    logging_steps: 10  # More frequent logging
+  
+  # Distillation hyperparameters (applies to both stages)
+  # ADJUSTED: More balanced CE vs KL weights
+  temperature: 2.0  # Reduced from 3.0 for more stable training
+  alpha_ce: 0.5  # Increased from 0.4 - more weight on ground truth
+  alpha_kl: 0.5  # Reduced from 0.6 - less aggressive distillation
+  
+  # Teacher generation settings (no thinking mode)
+  teacher_generation:
+    do_sample: false
+    temperature: 0.0  # Deterministic for consistent labels
+    max_new_tokens: 512
+    enable_thinking: false  # Critical: disable Qwen3 thinking mode
+    batch_size: 8  # Batch size for teacher generation
+    use_cache: true # Use KV cache for faster generation
+  
+  # Caching teacher logits (optimization)
+  cache_teacher_logits: false  # Disabled - dynamic batching makes caching complex
+  cache_dir: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/cache"
+
+  # Model saving
+  save_model_name: "frodi-swedish-student-kd"
+  restart_on_teacher_change: true
+
+# ============================================================================
+# PHASE 2: SELF-PLAY RL (GRPO) with Teacher Feedback
+# ============================================================================
+#
+# ABLATION STUDY CONFIGURATION (v1 - Accuracy Only):
+# - Task types: translation + QA only (summary disabled)
+# - Reward signals: accuracy only (grammar disabled)
+# - Future ablations will test: +grammar, +summary, different weightings
+#
+# To enable grammar: set grammar_enabled: true and grammar: 0.3
+# To enable summary: set summary: 0.1 and adjust translation/qa to sum to 1.0
+# ============================================================================
+
+rl:
+  output_dir: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/self_play_rl_swedish"
+  iterations: 900  # Extended run (continuing from checkpoint 600)
+  batch_size: 8  # REDUCED for 40GB GPUs (4 × 4 = 16 solutions per iteration)
+  learning_rate: 5.0e-6  # Lower LR to preserve Swedish grammar from KD
+  gradient_accumulation_steps: 4  # INCREASED to maintain effective batch (4 × 8 = 32)
+  max_length: 512  # Same as German config
+  
+  # GRPO parameters
+  grpo_group_size: 4  # Same as German config that worked
+  ppo_epochs: 4
+  
+  # ADAPTIVE KL CONTROL - RECALIBRATED based on observed KL values (German trainer approach)
+  # The previous target of 6.0 was far too high - actual KL values are 0.01-0.20
+  # This caused the KL coefficient to decay to near-zero, removing the policy constraint
+  adap_kl_ctrl: true
+  init_kl_coef: 0.1        # Starting KL coefficient
+  target: 0.1              # REDUCED from 6.0 to match actual KL scale
+  horizon: 10000
+  kl_coef_min: 0.05        # INCREASED from 0.001 to prevent collapse
+  kl_coef_max: 0.5
+  advantage_clip: 3.0
+  advantage_epsilon: 1.0e-6
+  kl_decay: 0.95           # SLOWER decay (was 0.8) to prevent coefficient collapse
+  kl_growth: 1.2           # SLOWER growth (was 1.5) for more stable adaptation
+  
+  # Reference model update - NOW UPDATED EVERY OPTIMIZER STEP (German trainer approach)
+  # This keeps the reference close to the student, maintaining a meaningful anchor
+  # The ref_update_interval is no longer used - reference is updated after every step
+  ref_update_interval: 1   # Update reference every optimizer step (German approach)
+  
+  # Reward weights - Swedish-focused
+  # NOTE: For ablation studies, individual components can be toggled on/off
+  reward_weights:
+    accuracy: 1.0  # Binary log-odds for correctness
+    fluency: 0.0   # Disabled (handled by grammar)
+    reconstruction: 0.0  # No back-translation
+    novelty: 0.0
+    grammar: 0.0  # Swedish grammar quality (disabled for initial ablation)
+    grammar_enabled: false  # Master switch for grammar evaluation (for ablation studies)
+  
+  # Adaptive weights
+  adaptive_weights: true
+  weight_update_interval: 100
+  
+  # KL regularization (stronger to preserve Swedish fluency)
+  kl_penalty_coef: 0.08
+  kl_penalty_warmup_steps: 500
+  max_kl_divergence: 5.0
+  entropy_penalty_weight: 0.01
+  min_response_tokens: 10
+  qa_min_response_tokens: 3
+  qa_short_response_advantage_margin: -0.5
+  
+  # Reference model KL - enabled for proper policy regularization (same as German)
+  skip_reference_kl: false
+  
+  # Pretraining loss (maintain Swedish language ability)
+  pretraining_weight: 0.3  # Same as German config
+  pretraining_samples_per_batch: 2  # Same as German config
+  
+  # Reward normalization
+  reward_clip_min: -1.0
+  reward_clip_max: 1.0
+  reward_norm_momentum: 0.1
+  reward_downscale: 0.5
+  
+  # Generation parameters
+  generation:
+    max_new_tokens: 256
+    min_new_tokens: 5
+    temperature: 0.7
+    top_p: 0.9
+    top_k: 50
+    do_sample: true
+    repetition_penalty: 1.1
+
+# ============================================================================
+# CURRICULUM LEARNING
+# ============================================================================
+
+curriculum:
+  max_buffer_size: 1000
+  initial_difficulty: 0.5
+  target_success_rate: 0.7
+  difficulty_adaptation_rate: 0.02
+  
+  # Task distribution for Swedish
+  # NOTE: For ablation studies, individual task types can be toggled on/off
+  # Probabilities must sum to 1.0 for enabled tasks
+  task_types:
+    translation: 0.6  # Swedish↔English translation (increased since summary disabled)
+    qa: 0.4           # Swedish QA
+    summary: 0.0      # Swedish summarization (disabled for initial ablation)
+    reasoning: 0.0    # Disabled for now
+  
+  temperature: 1.0
+  context_examples: 1
+
+# ============================================================================
+# TASK GENERATION
+# ============================================================================
+
+task_generation:
+  min_text_length: 10
+  max_text_length: 150
+  novelty_threshold: 0.3
+  difficulty_estimation_samples: 2
+  validate_tasks: true
+  validation_timeout: 30
+
+# ============================================================================
+# EVALUATION (EuroEval Swedish Validation)
+# ============================================================================
+
+evaluation:
+  # EuroEval periodic evaluation during GRPO training
+  eval_interval: 100  # Run EuroEval every N iterations (after weight updates)
+  eval_batch_size: 16  # Batch size for EuroEval (higher = faster)
+  num_iterations: 1  # EuroEval iterations per evaluation (1 for speed, 3 for stability)
+  
+  # PARALLEL EVALUATION: Submit sbatch jobs for EuroEval during training
+  # When enabled, each checkpoint triggers an sbatch job using euroeval.sif
+  # This allows evaluation to run in parallel while training continues with env.sif
+  submit_eval_jobs: true  # Submit EuroEval jobs at each checkpoint
+  
+  # Checkpoint management
+  save_interval: 100  # Save checkpoint every N iterations for evaluation
+  max_checkpoints_to_keep: 5  # Keep last N eval checkpoints
+  
+  # Best model selection based on EuroEval aggregate score
+  track_best_model: true
+  best_model_metric: "aggregate_score"  # Mean of all Swedish benchmark scores
+  
+  # EuroEval configuration
+  euroeval:
+    language: "sv"
+    evaluate_val_split: true  # Use validation split for faster eval
+    trust_remote_code: true
+    cache_dir: "/proj/berzelius-aiics-real/users/x_anbue/euroeval/.euroeval_cache"
+    container: "/proj/berzelius-aiics-real/users/x_anbue/euroeval.sif"
+  
+  # Swedish benchmarks tracked (all contribute to aggregate score)
+  swedish_benchmarks:
+    - swerec           # Sentiment classification (MCC)
+    - scala-sv         # Linguistic acceptability (MCC)
+    - suc3             # Named entity recognition (micro F1)
+    - scandiqa-sv      # Reading comprehension (F1)
+    - swedn            # Summarization (BERTScore)
+    - mmlu-sv          # Knowledge (MCC)
+    - hellaswag-sv     # Common-sense reasoning (MCC)
+  
+  # Internal training metrics (logged separately)
+  training_metrics:
+    - "average_reward"
+    - "success_rate"
+    - "task_diversity"
+    - "kl_divergence"
+    - "perplexity"
+  
+  # Early stopping (disabled by default for GRPO)
+  early_stopping: false
+  patience: 1000
+  min_improvement: 0.01
+
+# ============================================================================
+# OPTIMIZATION
+# ============================================================================
+
+optimization:
+  use_fp16: true
+  mixed_precision: true  # ENABLED - same as German trainer (critical for memory efficiency)
+  gradient_clipping: 1.0  # Increased from 0.5 for stability
+  dataloader_num_workers: 4
+  pin_memory: true
+  adam_eps: 1.0e-5
+  
+  gradient_checkpointing: true
+  use_lora: false
+  memory_cleanup_interval: 5
+  policy_chunk_size: 2  # REDUCED from 4 for memory safety on smaller GPUs (40GB A100)
+  enable_kv_cache_for_generation: true
+  energy_maintenance_interval: 50  # GPU energy maintenance every N iterations
+  
+  # Reference model update tau (German trainer approach)
+  # Lower tau = faster tracking of student (more student influence per update)
+  # tau=0.95 means 5% student influence per update (vs tau=0.99 which was only 1%)
+  reference_update_tau: 0.95          # REDUCED from 0.99 for faster reference tracking
+  reference_sync_tau: 0.95            # Tau used for regular sync after optimizer step
+  
+  # Gradient spike detection and stabilization (German trainer approach)
+  # These parameters control automatic recovery from training instability
+  # NOTE: Observed gradient norms range 25-60 normally, with outliers up to 91.
+  # Threshold of 10.0 was catching EVERYTHING and preventing training.
+  # Set to 75.0 to only catch extreme spikes while allowing normal training.
+  grad_spike_threshold: 75.0          # INCREASED from 10.0 - gradient norms of 30-50 are normal
+  grad_spike_up: 3                    # Consecutive spikes before blending with reference
+  grad_spike_down: 1                  # Spike counter decay when gradients are healthy
+  reference_blend_alpha: 0.3          # How much to blend with reference on spikes (0.3 = 30% reference)
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+logging:
+  log_interval: 5  # Log every 5 iterations for better visibility
+  save_samples: true
+  sample_interval: 100
+  max_samples_to_save: 10
+  wandb_project: "frodi-swedish-self-play-rl"
+
+# ============================================================================
+# DEBUG
+# ============================================================================
+
+debug:
+  nan_diagnostics: true
+
+# ============================================================================
+# SWEDISH-SPECIFIC PROMPTS
+# ============================================================================
+
+prompts:
+  # Translation prompts
+  system_translation: "Du är en översättare. Översätt användarens text korrekt. Ge endast översättningen utan förklaringar, resonemang eller kommentarer."
+  
+  # QA prompts (Swedish)
+  system_qa_sv: "Du är en precis fråga-svar-assistent. Besvara frågor endast baserat på den givna kontexten och svara tydligt och koncist på svenska."
+  
+  # QA prompts (English)
+  system_qa_en: "You are a precise question answering assistant. Answer the question using only the provided context. Respond clearly and concisely in English."
+  
+  # Summary prompts
+  system_summary: "Du är en precis sammanfattare. Sammanfatta texten i två till tre meningar, håll dig till fakta och lägg inte till ny information."
+  system_summary_source: "Du utökar följande kontext till ett sammanhängande stycke med fyra till sex meningar. Håll dig helt till fakta och lägg endast till detaljer som är implicita i kontexten."

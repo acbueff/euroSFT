@@ -1,0 +1,45 @@
+# SFT Baseline Configuration for Qwen3-1.7B Swedish
+# Goal: Fair comparison against GRPO on EuroEval Swedish benchmarks
+# Same data, same base model, different training method
+#
+# Target: Leonardo HPC (A100 80GB, SLURM, offline compute nodes)
+
+model:
+  # Use local cached model on Leonardo (downloaded during setup)
+  name: "Qwen/Qwen3-1.7B"
+  # Override with local path when running offline on compute nodes
+  local_path: null  # Set via env var MODEL_PATH at runtime
+  enable_thinking: false  # Critical: disable Qwen3 thinking mode
+
+data:
+  # Path on Leonardo — set via env var or override at runtime
+  train_dir: "/leonardo_work/EUHPC_E05_119/abueff00/euroSFT/training-data/sv"
+  # All 7 EuroEval Swedish datasets, uniform sampling
+  datasets:
+    - swerec_train.json
+    - scala-sv_train.json
+    - suc3_train.json
+    - scandiqa-sv_train.json
+    - hellaswag-sv_train.json
+    - mmlu-sv_train.json
+    - swedn_train.json
+
+training:
+  output_dir: "/leonardo_work/EUHPC_E05_119/abueff00/euroSFT/output/qwen3-1.7b-sft-swedish"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8    # effective batch = 32
+  learning_rate: 2.0e-5
+  lr_scheduler_type: "linear"
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_seq_length: 512
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_strategy: "epoch"
+  seed: 42
+  dataloader_num_workers: 4
+
+  # No LoRA - full fine-tuning for fair comparison with GRPO
+  # No teacher model - pure SFT baseline

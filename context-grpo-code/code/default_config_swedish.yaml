@@ -1,0 +1,38 @@
+# FRÓÐI Default Configuration - SWEDISH ADAPTATION
+project_name: "frodi-swedish-self-play-rl"
+base_dir: "/home/x_anbue/frodi"
+seed: 42
+
+# Language configuration
+languages:
+  source: "sv"  # Swedish
+  target: "en"  # English (for translation tasks)
+  
+data:
+  source_lang: "sv"  # Swedish
+  target_lang: "en"  # English (for translation tasks)
+  
+  # Seed tasks for training
+  seed_tasks_path: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/seed_tasks.jsonl"
+  
+  # Monolingual corpora
+  source_corpus: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/swedish_monolingual.txt"
+  target_corpus: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/english_monolingual.txt"
+  
+  # Parallel translation data
+  parallel_data: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/parallel_translation_sv_en.jsonl"
+  
+  # QA data
+  qa_data: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/qa_data_swedish.jsonl"
+  
+  # Processed data output directory
+  local_data_dir: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data"
+  
+  # HuggingFace cache directory for raw downloads
+  hf_cache_dir: "/proj/berzelius-aiics-real/users/x_anbue/.huggingface_cache"
+
+# Logging
+logging:
+  level: "INFO"
+  log_file: "logs/frodi_swedish_training.log"
+

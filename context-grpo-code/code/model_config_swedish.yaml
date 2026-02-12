@@ -1,0 +1,85 @@
+# FRÓÐI Model Configuration - SWEDISH ADAPTATION
+# 
+# Phase 1 (Knowledge Distillation):
+#   - Teacher: Qwen/Qwen3-32B (no thinking mode)
+#   - Student: Qwen/Qwen3-1.7B (no thinking mode) - using local cache
+#
+# Phase 2 (GRPO Self-Play RL):
+#   - Student: Fine-tuned from Phase 1
+#   - Judge: mistralai/Mistral-Small-3.1-24B-Instruct-2503 (best Swedish performance)
+
+# Student model (to be trained) - using local cached version
+# This is the HuggingFace cache snapshot path
+student: "/proj/berzelius-aiics-real/users/x_anbue/euroeval/.euroeval_cache/model_cache/Qwen--Qwen3-1.7B/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+
+# Teacher model for Phase 1 Knowledge Distillation
+# Qwen3-32B is used for generating high-quality Swedish training data
+teacher: "Qwen/Qwen3-32B"
+
+# Judge model for Phase 2 GRPO
+# Used for reward computation during RL
+# Using the same model as teacher for consistency
+judge: "Qwen/Qwen3-32B"
+
+# Reference model (same architecture as student) - using local cached version
+reference: "/proj/berzelius-aiics-real/users/x_anbue/euroeval/.euroeval_cache/model_cache/Qwen--Qwen3-1.7B/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+
+# Back-translation model (disabled for Swedish - focus on direct training)
+# back_translation: null
+
+# LoRA configuration (if using LoRA for memory efficiency)
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.1
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# Teacher model quantization for memory efficiency
+# Required for 32B model on single GPU
+teacher_quantization:
+  load_in_8bit: false
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+# Judge model quantization (Phase 2)
+judge_quantization:
+  load_in_8bit: false
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+# Generation settings for teacher (no thinking mode)
+teacher_generation:
+  do_sample: false
+  temperature: 0.0
+  max_new_tokens: 512
+  # Critical: Qwen3 models have thinking mode - must be disabled
+  enable_thinking: false
+
+# Generation settings for student
+student_generation:
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.9
+  max_new_tokens: 256
+  enable_thinking: false
+
+# Output paths for trained models
+output:
+  phase1_model_name: "frodi-swedish-student-kd-v2"  # New version with anti-forgetting
+  phase2_model_name: "frodi-swedish-qwen3-1.7b-grpo"
+  save_dir: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/models"
+
+# CPT checkpoint path (for SFT-only runs)
+cpt_checkpoint: "/proj/berzelius-aiics-real/users/x_anbue/frodi_data/distillation_swedish/cpt_checkpoint_epoch_1"
+
