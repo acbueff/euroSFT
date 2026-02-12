@@ -21,7 +21,7 @@ trap 'echo "Error at line $LINENO at $(date)" >&2' ERR
 WORK_DIR="/leonardo_work/EUHPC_E05_119/abueff00/euroSFT"
 PROJECT_DIR="/leonardo/home/userexternal/abueff00/euroSFT"
 MODEL_DIR="${WORK_DIR}/models/Qwen3-1.7B"
-DATA_DIR="${WORK_DIR}/training-data/sv"
+DATA_DIR="${PROJECT_DIR}/training-data/sv"
 OUTPUT_DIR="${WORK_DIR}/output/qwen3-1.7b-sft-swedish"
 CODE_DIR="${PROJECT_DIR}/code"
 

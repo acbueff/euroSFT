@@ -12,8 +12,8 @@ model:
   enable_thinking: false  # Critical: disable Qwen3 thinking mode
 
 data:
-  # Path on Leonardo — set via env var or override at runtime
-  train_dir: "/leonardo_work/EUHPC_E05_119/abueff00/euroSFT/training-data/sv"
+  # Data lives in $HOME alongside code (only 7.4 MB)
+  train_dir: "/leonardo/home/userexternal/abueff00/euroSFT/training-data/sv"
   # All 7 EuroEval Swedish datasets, uniform sampling
   datasets:
     - swerec_train.json

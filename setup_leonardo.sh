@@ -41,7 +41,7 @@ upload_files() {
     # Create remote directories
     ssh "${LEONARDO_HOST}" "
         mkdir -p ${REMOTE_HOME}/code
-        mkdir -p ${REMOTE_WORK}/training-data/sv
+        mkdir -p ${REMOTE_HOME}/training-data/sv
         mkdir -p ${REMOTE_WORK}/output
         mkdir -p ${REMOTE_WORK}/models
         mkdir -p ${REMOTE_WORK}/hf_cache
@@ -53,9 +53,9 @@ upload_files() {
     scp "${LOCAL_DIR}/run_leonardo.sh" "${LEONARDO_HOST}:${REMOTE_HOME}/"
     scp "${LOCAL_DIR}/requirements.txt" "${LEONARDO_HOST}:${REMOTE_HOME}/"
 
-    # Upload training data (7.4 MB total — very fast)
+    # Upload training data to $HOME (7.4 MB — lives alongside code)
     echo "Uploading training data..."
-    scp "${LOCAL_DATA}/sv/"*.json "${LEONARDO_HOST}:${REMOTE_WORK}/training-data/sv/"
+    scp "${LOCAL_DATA}/sv/"*.json "${LEONARDO_HOST}:${REMOTE_HOME}/training-data/sv/"
 
     echo "Upload complete."
 }
