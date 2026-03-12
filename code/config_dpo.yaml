@@ -1,0 +1,60 @@
+# DPO Configuration for Qwen3-1.7B Swedish
+# Base model: Qwen3-1.7B (same as SFT baseline)
+# Reference model: same base model (frozen), policy wrapped with LoRA
+# Training data: weak-model-generated preference pairs (scandiqa + swedn)
+#
+# Target: Leonardo HPC (A100 80GB, SLURM, offline compute nodes)
+# Output: /leonardo_work/EUHPC_D21_101/abueff00/euroeval/
+
+model:
+  name: "Qwen/Qwen3-1.7B"
+  local_path: null  # Set via env var MODEL_PATH at runtime
+
+data:
+  # Directory containing the JSONL DPO preference pairs
+  dpo_data_dir: "/leonardo_work/EUHPC_D21_101/abueff00/euroeval/dpo-preference-data/qwen3-0.6b-rejected"
+  files:
+    # Weak-model generated (Qwen3-0.6B) — open-ended tasks
+    - scandiqa-sv_train_dpo_pairs.jsonl
+    - swedn_train_dpo_pairs.jsonl
+    # Rule-based construction — structured / classification tasks
+    - hellaswag-sv_train_dpo_pairs.jsonl
+    - mmlu-sv_train_dpo_pairs.jsonl
+    - swerec_train_dpo_pairs.jsonl
+    - scala-sv_train_dpo_pairs.jsonl
+    - suc3_train_dpo_pairs.jsonl
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+dpo:
+  beta: 0.1             # KL regularization coefficient
+  loss_type: "sigmoid"  # Standard DPO loss
+  max_length: 512       # Max total sequence length (prompt + response)
+
+training:
+  output_dir: "/leonardo_work/EUHPC_D21_101/abueff00/euroeval/output/qwen3-1.7b-dpo-swedish"
+  num_train_epochs: 3
+  per_device_train_batch_size: 2   # DPO processes pairs; lower than SFT
+  gradient_accumulation_steps: 16  # effective batch = 32 pairs
+  learning_rate: 5.0e-7            # DPO is sensitive — keep low
+  lr_scheduler_type: "linear"
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_strategy: "epoch"
+  seed: 42
+  dataloader_num_workers: 4

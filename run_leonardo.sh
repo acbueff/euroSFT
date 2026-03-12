@@ -63,6 +63,10 @@ if [ "$USE_CONTAINER" = true ]; then
         exit 1
     fi
 
+    # Extra Python packages installed outside the container (e.g. trl)
+    PIP_PACKAGES="${WORK_DIR}/pip_packages"
+    export SINGULARITYENV_PYTHONPATH="${PIP_PACKAGES}:${PYTHONPATH:-}"
+
     # Forward env vars into container
     export SINGULARITYENV_MODEL_PATH="$MODEL_PATH"
     export SINGULARITYENV_DATA_DIR="$DATA_DIR"

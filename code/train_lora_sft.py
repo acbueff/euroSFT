@@ -1,8 +1,8 @@
 """
-SFT baseline trainer for Qwen3-1.7B on EuroEval Swedish.
+LoRA SFT trainer for Qwen3-1.7B on EuroEval Swedish.
 
-Pure supervised fine-tuning — no distillation, no LoRA.
-Designed for direct comparison against the GRPO-trained model.
+Low-rank adapter fine-tuning — base model weights are frozen,
+only LoRA adapter weights are trained (~10-20M parameters).
 
 Target: Leonardo HPC (A100, SLURM, offline compute nodes).
 """
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import torch
 import yaml
+from peft import LoraConfig, TaskType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
@@ -27,16 +28,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_config(config_path: str = "config.yaml") -> dict:
+def load_config(config_path: str = "config_lora.yaml") -> dict:
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
 
 def main():
-    config = load_config(Path(__file__).parent / "config.yaml")
+    config = load_config(Path(__file__).parent / "config_lora.yaml")
 
     model_cfg = config["model"]
     data_cfg = config["data"]
+    lora_cfg = config["lora"]
     train_cfg = config["training"]
 
     # Allow env-var overrides for Leonardo paths
@@ -44,8 +46,8 @@ def main():
     data_dir = os.environ.get("DATA_DIR") or data_cfg["train_dir"]
     output_dir = os.environ.get("OUTPUT_DIR") or train_cfg["output_dir"]
 
-    logger.info(f"Model: {model_path}")
-    logger.info(f"Data:  {data_dir}")
+    logger.info(f"Model:  {model_path}")
+    logger.info(f"Data:   {data_dir}")
     logger.info(f"Output: {output_dir}")
 
     # ------------------------------------------------------------------
@@ -57,16 +59,34 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     # ------------------------------------------------------------------
-    # Model
+    # Base model (loaded in bfloat16; LoRA keeps it frozen)
     # ------------------------------------------------------------------
-    logger.info("Loading model...")
+    logger.info("Loading base model...")
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
     )
 
-    logger.info(f"Model parameters: {model.num_parameters():,}")
+    total_params = model.num_parameters()
+    logger.info(f"Base model parameters: {total_params:,}")
+
+    # ------------------------------------------------------------------
+    # LoRA config
+    # ------------------------------------------------------------------
+    lora_config = LoraConfig(
+        r=lora_cfg["r"],
+        lora_alpha=lora_cfg["lora_alpha"],
+        lora_dropout=lora_cfg["lora_dropout"],
+        bias=lora_cfg["bias"],
+        target_modules=lora_cfg["target_modules"],
+        task_type=TaskType.CAUSAL_LM,
+    )
+
+    logger.info(
+        f"LoRA config: r={lora_cfg['r']}, alpha={lora_cfg['lora_alpha']}, "
+        f"target_modules={lora_cfg['target_modules']}"
+    )
 
     # ------------------------------------------------------------------
     # Dataset
@@ -75,7 +95,6 @@ def main():
     train_dataset = load_and_format_dataset(data_dir)
     logger.info(f"Training examples: {len(train_dataset)}")
 
-    # Shuffle the dataset (mixing tasks uniformly)
     train_dataset = train_dataset.shuffle(seed=train_cfg["seed"])
 
     # ------------------------------------------------------------------
@@ -103,25 +122,30 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Trainer
+    # Trainer (peft_config triggers automatic LoRA wrapping)
     # ------------------------------------------------------------------
     trainer = SFTTrainer(
         model=model,
         args=sft_config,
         train_dataset=train_dataset,
         processing_class=tokenizer,
+        peft_config=lora_config,
     )
+
+    # Log trainable vs frozen parameter counts
+    trainable = sum(p.numel() for p in trainer.model.parameters() if p.requires_grad)
+    logger.info(f"Trainable parameters: {trainable:,} ({100 * trainable / total_params:.2f}% of base model)")
 
     # ------------------------------------------------------------------
     # Train
     # ------------------------------------------------------------------
-    logger.info("Starting SFT training...")
+    logger.info("Starting LoRA SFT training...")
     train_result = trainer.train()
 
     # ------------------------------------------------------------------
-    # Save
+    # Save adapter weights only (not the full base model)
     # ------------------------------------------------------------------
-    logger.info(f"Saving model to {output_dir}")
+    logger.info(f"Saving LoRA adapter to {output_dir}")
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
 
@@ -131,8 +155,9 @@ def main():
     trainer.save_state()
 
     logger.info("Training complete.")
-    logger.info(f"  Loss: {metrics.get('train_loss', 'N/A'):.4f}")
+    logger.info(f"  Loss:    {metrics.get('train_loss', 'N/A'):.4f}")
     logger.info(f"  Runtime: {metrics.get('train_runtime', 0):.0f}s")
+    logger.info(f"  Adapter saved to: {output_dir}")
 
 
 if __name__ == "__main__":

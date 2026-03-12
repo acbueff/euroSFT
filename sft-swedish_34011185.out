@@ -1,0 +1,48 @@
+======================================
+SFT Swedish — Qwen3-1.7B
+======================================
+Job ID: 34011185 | Node: lrdn0037.leonardo.local | Start: tor feb 12 14:05:21 CET 2026
+Model:  /leonardo_work/EUHPC_E05_119/abueff00/euroSFT/models/Qwen3-1.7B
+Data:   /leonardo/home/userexternal/abueff00/euroSFT/training-data/sv
+Output: /leonardo_work/EUHPC_E05_119/abueff00/euroSFT/output/qwen3-1.7b-sft-swedish
+Thu Feb 12 14:05:21 2026       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.274.02             Driver Version: 535.274.02   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA A100-SXM-64GB           On  | 00000000:8F:00.0 Off |                    0 |
+| N/A   44C    P0              63W / 461W |      0MiB / 65536MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+
+2026-02-12 14:05:48,192 [INFO] __main__: Model: /leonardo_work/EUHPC_E05_119/abueff00/euroSFT/models/Qwen3-1.7B
+2026-02-12 14:05:48,192 [INFO] __main__: Data:  /leonardo/home/userexternal/abueff00/euroSFT/training-data/sv
+2026-02-12 14:05:48,192 [INFO] __main__: Output: /leonardo_work/EUHPC_E05_119/abueff00/euroSFT/output/qwen3-1.7b-sft-swedish
+2026-02-12 14:05:48,618 [INFO] __main__: Loading model...
+2026-02-12 14:05:53,390 [INFO] __main__: Model parameters: 1,720,574,976
+2026-02-12 14:05:53,390 [INFO] __main__: Loading and formatting training data...
+2026-02-12 14:05:53,395 [INFO] data_loader: Loaded 1024 samples from swerec_train.json (sentiment)
+2026-02-12 14:05:53,398 [INFO] data_loader: Loaded 1024 samples from scala-sv_train.json (acceptability)
+2026-02-12 14:05:53,408 [INFO] data_loader: Loaded 1024 samples from suc3_train.json (ner)
+2026-02-12 14:05:53,424 [INFO] data_loader: Loaded 1024 samples from scandiqa-sv_train.json (reading_comprehension)
+2026-02-12 14:05:53,434 [INFO] data_loader: Loaded 1024 samples from hellaswag-sv_train.json (commonsense)
+2026-02-12 14:05:53,439 [INFO] data_loader: Loaded 1024 samples from mmlu-sv_train.json (knowledge)
+2026-02-12 14:05:53,452 [INFO] data_loader: Loaded 1024 samples from swedn_train.json (summarization)
+2026-02-12 14:05:53,452 [INFO] data_loader: Total training examples: 7168
+2026-02-12 14:05:53,518 [INFO] __main__: Training examples: 7168
+
+======================================
+SFT complete | Exit: 1 | End: tor feb 12 14:05:55 CET 2026
+Output: /leonardo_work/EUHPC_E05_119/abueff00/euroSFT/output/qwen3-1.7b-sft-swedish
+Training failed

@@ -1,0 +1,52 @@
+# LoRA SFT Configuration for Qwen3-1.7B Swedish
+# LoRA fine-tuning — low-rank adapters only, base weights frozen.
+#
+# Target: Leonardo HPC (A100 80GB, SLURM, offline compute nodes)
+# Output: /leonardo_work/EUHPC_D21_101/containers/euro-sft/
+
+model:
+  name: "Qwen/Qwen3-1.7B"
+  local_path: null  # Set via env var MODEL_PATH at runtime
+
+data:
+  train_dir: "/leonardo/home/userexternal/abueff00/euroSFT/training-data/sv"
+  datasets:
+    - swerec_train.json
+    - scala-sv_train.json
+    - suc3_train.json
+    - scandiqa-sv_train.json
+    - hellaswag-sv_train.json
+    - mmlu-sv_train.json
+    - swedn_train.json
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  # All linear projection layers in Qwen3
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  output_dir: "/leonardo_work/EUHPC_D21_101/containers/euro-sft/output/qwen3-1.7b-lora-sft-swedish-v2"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8    # effective batch = 32
+  learning_rate: 2.0e-4             # higher LR appropriate for LoRA adapters
+  lr_scheduler_type: "linear"
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_seq_length: 512
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_strategy: "epoch"
+  seed: 42
+  dataloader_num_workers: 4

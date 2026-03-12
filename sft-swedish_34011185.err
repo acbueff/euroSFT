@@ -1,0 +1,12 @@
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+You are attempting to use Flash Attention 2.0 with a model not initialized on GPU. Make sure to move the model to GPU after initializing it on CPU with `model.to('cuda')`.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:04<00:04,  4.37s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:04<00:00,  2.19s/it]
+Traceback (most recent call last):
+  File "/leonardo/home/userexternal/abueff00/euroSFT/code/train_sft.py", line 139, in <module>
+    main()
+  File "/leonardo/home/userexternal/abueff00/euroSFT/code/train_sft.py", line 84, in main
+    sft_config = SFTConfig(
+                 ^^^^^^^^^^
+TypeError: SFTConfig.__init__() got an unexpected keyword argument 'max_seq_length'
+Error at line 111 at tor feb 12 14:05:55 CET 2026

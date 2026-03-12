@@ -23,8 +23,8 @@ SYSTEM_PROMPTS = {
         "Svara med exakt ett ord: positiv, negativ, neutral eller blandad."
     ),
     "acceptability": (
-        "Du bedömer grammatisk korrekthet i svenska meningar. "
-        "Svara med exakt ett ord: korrekt eller inkorrekt."
+        "You assess grammatical correctness of Swedish sentences. "
+        "Reply with exactly one word: correct or incorrect."
     ),
     "ner": (
         "Du identifierar namngivna entiteter i svenska texter. "
@@ -80,15 +80,15 @@ def _format_sentiment(sample: dict) -> tuple[str, str]:
 
 def _format_acceptability(sample: dict) -> tuple[str, str]:
     text = sample.get("text", "")
-    label = sample.get("label", "")  # "correct" / "incorrect" → Swedish
-    label_sv = "korrekt" if label == "correct" else "inkorrekt"
+    label = sample.get("label", "")  # keep as-is: "correct" / "incorrect"
     user_msg = (
-        "Bedöm om följande mening är grammatiskt korrekt och naturlig "
-        "på svenska. Svara med ett enda ord: 'korrekt' eller 'inkorrekt'.\n\n"
-        f"Mening: {text}\n\n"
-        "Bedömning:"
+        "Assess whether the following Swedish sentence is grammatically "
+        "correct and natural. Reply with exactly one word: "
+        "'correct' or 'incorrect'.\n\n"
+        f"Sentence: {text}\n\n"
+        "Assessment:"
     )
-    return user_msg, label_sv
+    return user_msg, label
 
 
 def _format_ner(sample: dict) -> tuple[str, str]:
